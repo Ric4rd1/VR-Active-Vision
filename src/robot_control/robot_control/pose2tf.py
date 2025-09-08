@@ -2,7 +2,7 @@ import rclpy
 from rclpy.node import Node 
 from geometry_msgs.msg import Pose
 from geometry_msgs.msg import TransformStamped
-from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
+from tf2_ros import TransformBroadcaster
 
 class Pose2tf(Node):
     def __init__(self):
@@ -10,23 +10,12 @@ class Pose2tf(Node):
 
         self.pose_topic = "headset_pose"
 
-        self.tf_static_broadcaster = StaticTransformBroadcaster(self)
-        pose_msg = Pose()
-        pose_msg.position.x = 1.0
-        pose_msg.position.y = 2.0
-        pose_msg.position.z = 0.0
-
-        pose_msg.orientation.x = 0.0
-        pose_msg.orientation.y = 0.0
-        pose_msg.orientation.z = 0.0
-        pose_msg.orientation.w = 1.0  # identity quaternion
-        # publish static transform one at startup
-        self.make_transforms(pose_msg)
+        self.tf_broadcaster = TransformBroadcaster(self)
 
         # Subscription
         self.pose_sub = self.create_subscription(Pose, self.pose_topic, self.make_transforms, 10)
 
-    def make_transforms(self, pose_transform: Pose):
+    def make_transforms(self, msg):
         t = TransformStamped()
         
         # Header
@@ -35,12 +24,12 @@ class Pose2tf(Node):
         t.child_frame_id = "headset"
 
         # Transform
-        t.transform.translation.x = pose_transform.position.x
-        t.transform.translation.y = pose_transform.position.y
-        t.transform.translation.z = pose_transform.position.z
-        t.transform.rotation = pose_transform.orientation
+        t.transform.translation.x = msg.position.x
+        t.transform.translation.y = msg.position.y
+        t.transform.translation.z = msg.position.z
+        t.transform.rotation = msg.orientation
 
-        self.tf_static_broadcaster.sendTransform(t)
+        self.tf_broadcaster.sendTransform(t)
         self.get_logger().info(f"Published transform from world to headset: {t}")
 
 
