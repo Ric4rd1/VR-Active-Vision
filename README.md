@@ -14,7 +14,7 @@ The application is oriented towards **agricultural environments**, addressing ch
 
 ## 🚀 Setup Instructions
 For setup and installation details, please refer to the dedicated guide:  
-👉 [Setup Instructions](SETUP.md)
+👉 [Setup Instructions](https://docs.google.com/document/d/169PzqmcX6txEb10fj3BbERi2wmETntBMpJT48AJlcgg/edit?usp=sharing)
 
 ## Videos 🎥
 
