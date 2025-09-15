@@ -4,16 +4,14 @@ from geometry_msgs.msg import Pose
 from xarm_msgs.srv import MoveCartesian, MoveJoint
 from xarm_msgs.srv import SetInt16ById, SetInt16
 
-class xTrack(Node):
+class xyzTrack(Node):
     def __init__(self):
-        super().__init__('xtrack_servo')
-        self.get_logger().info('xtrack servo initialized')
-
-        # Subscribe to the track topic
-        self.pose_sub = self.create_subscription(Pose, 'headset_pose', self.pose_callback, 10)
+        super().__init__('xyztrack_servo')
+        self.get_logger().info('xyzTrack servo initialized')
 
         # Create variables
         self.home = [200.0, 0.0, 200.0, 3.14, -1.4, 0.0]
+        self.last_pose = self.home[:]
         self.latest_pose = None
         self.first_pose = None
         self.first_pose_received = False
@@ -21,7 +19,7 @@ class xTrack(Node):
                
         # Define constants
         self.speed = float(80)
-        self.speed_joint = float(0.2)
+        #self.speed_joint = float(0.2)
         self.wait = False
         self.gain = 5.0 # Scaling headset to robot movement  
         self.step_size = 5.0 # interpolate when is bigger than this
@@ -38,13 +36,15 @@ class xTrack(Node):
         else:
             self.get_logger().error("Failed to move home")
 
-        self.last_pose = self.home[:]
         self.get_logger().info('Robot initialized')
 
         self.set_mode_1()
 
         # Timer for checking new poses (10 Hz)
         #self.create_timer(0.05, self.timer_callback)
+
+        # Subscribe to the track topic
+        self.pose_sub = self.create_subscription(Pose, 'headset_pose', self.pose_callback, 10)
         
         self.get_logger().info("Robot ready to start")
 
@@ -131,12 +131,14 @@ class xTrack(Node):
         else:
             self.get_logger().error('Failed to call /ufactory/set_state')
 
+    # Cartesian pose for mode 1 (servo)
     def send_servo_pose(self, pose):
         req = MoveCartesian.Request()
         req.pose = pose
         future = self.client.call_async(req)
         return future
 
+    # Cartesian pose for mode 0
     def send_pose(self, pose):
         req = MoveCartesian.Request()
         req.speed = self.speed
@@ -157,14 +159,24 @@ class xTrack(Node):
 
         # Compute X displacement (meters → mm)
         x_offset = (msg.position.x - self.first_pose.position.x) * 1000.0 
-        #x_offset /= self.gain  # Apply gain 
+        x_offset /= self.gain  # Apply gain 
         x_offset = max(0.0, min(200.0, x_offset)) # Clamp to [0, 200 mm]
+
+        # Compute Y displacement (meters → mm)
+        y_offset = (msg.position.y - self.first_pose.position.y) * 1000
+        y_offset /= self.gain  # Apply gain
+        y_offset = max(-100.0, min(100.0, y_offset)) # Clamp to [-100, 100 mm]
+
+        # Compute Z displacement (meters → mm)
+        z_offset = (msg.position.z - self.first_pose.position.z) * 1000
+        z_offset /= self.gain  # Apply gain
+        z_offset = max(-100.0, min(100.0, z_offset)) # Clamp to [-100, 100 mm]
 
         # Build absolute pose (only X moves, Y/Z and orientation stay at home)
         target_pose = [
             self.home[0] + x_offset,   # X updated
-            self.home[1],              # Y stays
-            self.home[2],              # Z stays
+            self.home[1] + y_offset,   # Y updated
+            self.home[2] + z_offset,   # Z stays
             self.home[3],              # RX stays
             self.home[4],              # RY stays
             self.home[5],              # RZ stays
@@ -173,14 +185,17 @@ class xTrack(Node):
         #new_pose[0] = max(self.home[0] - 200.0, min(self.home[0] + 200.0, new_pose[0]))
 
         dx = target_pose[0] - self.last_pose[0]
-        if abs(dx) > self.step_size:
-            if abs(dx) > 20.0:
-                self.get_logger().warning(f"Large jump in X detected: {dx:.1f} mm, stoping movement")
+        dy = target_pose[1] - self.last_pose[1]
+        dz = target_pose[2] - self.last_pose[2]
+        d = ((dx**2 + dy**2)**0.5 + dz**2)**0.5
+        if abs(d) > self.step_size:
+            if abs(d) > 20.0:
+                self.get_logger().warning(f"Large jump in XY detected: {d:.1f} mm, stoping movement")
                 self.emergency_stop = True
                 return
             # break into smaller steps
-            steps = int(abs(dx) // self.step_size)
-            direction = 1 if dx > 0 else -1
+            steps = int(abs(d) // self.step_size)
+            direction = 1 if d > 0 else -1
             for i in range(steps):
                 intermediate_pose = self.last_pose[:]
                 intermediate_pose[0] += direction * self.step_size
@@ -191,21 +206,15 @@ class xTrack(Node):
         self.send_servo_pose(target_pose)
         self.last_pose = target_pose
 
-        self.get_logger().info(f"Moving to X = {target_pose[0]:.1f} mm")
+        self.get_logger().info(f"Moving to XYZ = {target_pose[0]:.1f}X {target_pose[1]:.1f}Y {target_pose[2]:.1f}Z mm")
 
-        
-    def timer_callback(self):
-        if self.latest_pose is not None:
-            self.send_request_cartesian(self.latest_pose)
-            self.get_logger().info(f"Moving to X = {self.latest_pose[0]:.1f} mm")
-            self.latest_pose = None  # reset to avoid repeating the same command
 
 
 def main(args=None):
     rclpy.init(args=args)
-    xtrack = xTrack()
-    rclpy.spin(xtrack)
-    xtrack.destroy_node()
+    xyztrack = xyzTrack()
+    rclpy.spin(xyztrack)
+    xyztrack.destroy_node()
     rclpy.shutdown()
 
 if __name__ == '__main__':

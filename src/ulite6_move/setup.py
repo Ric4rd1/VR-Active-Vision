@@ -25,6 +25,8 @@ setup(
             'xTrack = ulite6_move.xTrack:main',
             'xTrack_servo = ulite6_move.xTrack_servo:main',
             'pose_publisher = ulite6_move.pose_publisher:main',
+            'xyTrack_servo = ulite6_move.xyTrack_servo:main',
+            'xyzTrack_servo = ulite6_move.xyzTrack_servo:main',
         ],
     },
 )
