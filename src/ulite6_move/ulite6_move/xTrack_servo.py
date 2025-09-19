@@ -3,6 +3,7 @@ from rclpy.node import Node
 from geometry_msgs.msg import Pose
 from xarm_msgs.srv import MoveCartesian, MoveJoint
 from xarm_msgs.srv import SetInt16ById, SetInt16
+import math
 
 class xTrack(Node):
     def __init__(self):
@@ -14,16 +15,17 @@ class xTrack(Node):
 
         # Create variables
         self.home = [200.0, 0.0, 200.0, 3.14, -1.4, 0.0]
-        self.latest_pose = None
         self.first_pose = None
         self.first_pose_received = False
         self.emergency_stop = False
+        self.latest_target_pose = self.home[:] # last headset target
+        self.last_pose = self.home[:]          # last sent to robot
                
         # Define constants
         self.speed = float(80)
         self.speed_joint = float(0.2)
         self.wait = False
-        self.gain = 5.0 # Scaling headset to robot movement  
+        self.gain = 3.0 # Scaling headset to robot movement  
         self.step_size = 5.0 # interpolate when is bigger than this
 
 
@@ -42,12 +44,17 @@ class xTrack(Node):
         self.get_logger().info('Robot initialized')
 
         self.set_mode_1()
-
-        # Timer for checking new poses (10 Hz)
-        #self.create_timer(0.05, self.timer_callback)
         
         self.get_logger().info("Robot ready to start")
 
+        self.dt = 1.0/200.0  
+        # Create a fixed 125 Hz timer to publish smoothed poses
+        self.timer = self.create_timer(self.dt, self.update_loop)
+
+        # Interpolation constant
+        self.tau = 0.03  # smoothing time constant (seconds)
+        #self.k = 1.0 - math.exp(-self.dt/self.tau)
+        self.k = 0.02
     def init_robot(self):
         # Create a client for the /ufactory/motion_enable service
         self.motion_enable_client = self.create_client(SetInt16ById, '/ufactory/motion_enable')
@@ -144,6 +151,9 @@ class xTrack(Node):
         req.pose = pose
         future = self.client_0.call_async(req)
         return future
+    
+    def lerp(self, start, end, t):
+        return start + t * (end - start)
 
     def pose_callback(self, msg):
         if not self.first_pose_received:
@@ -157,11 +167,11 @@ class xTrack(Node):
 
         # Compute X displacement (meters → mm)
         x_offset = (msg.position.x - self.first_pose.position.x) * 1000.0 
-        #x_offset /= self.gain  # Apply gain 
+        x_offset /= self.gain  # Apply gain 
         x_offset = max(0.0, min(200.0, x_offset)) # Clamp to [0, 200 mm]
 
         # Build absolute pose (only X moves, Y/Z and orientation stay at home)
-        target_pose = [
+        self.latest_target_pose = [
             self.home[0] + x_offset,   # X updated
             self.home[1],              # Y stays
             self.home[2],              # Z stays
@@ -170,35 +180,24 @@ class xTrack(Node):
             self.home[5],              # RZ stays
         ]
 
-        #new_pose[0] = max(self.home[0] - 200.0, min(self.home[0] + 200.0, new_pose[0]))
+    def update_loop(self):
+        if not self.first_pose_received or self.emergency_stop:
+            return
 
-        dx = target_pose[0] - self.last_pose[0]
-        if abs(dx) > self.step_size:
-            if abs(dx) > 20.0:
-                self.get_logger().warning(f"Large jump in X detected: {dx:.1f} mm, stoping movement")
-                self.emergency_stop = True
-                return
-            # break into smaller steps
-            steps = int(abs(dx) // self.step_size)
-            direction = 1 if dx > 0 else -1
-            for i in range(steps):
-                intermediate_pose = self.last_pose[:]
-                intermediate_pose[0] += direction * self.step_size
-                self.send_servo_pose(intermediate_pose)
-                self.last_pose = intermediate_pose
+        # Smoothly move last_pose towards latest_target_pose
+        smoothed = []
+        for lp, tp in zip(self.last_pose, self.latest_target_pose):
+            smoothed.append(self.lerp(lp, tp, self.k))
 
-        # Finally send the exact target
-        self.send_servo_pose(target_pose)
-        self.last_pose = target_pose
+        # Safety check: large jump
+        dx = smoothed[0] - self.last_pose[0]
+        if abs(dx) > 20.0:
+            self.get_logger().warning(f"Large jump {dx:.1f} mm, stopping")
+            self.emergency_stop = True
+            return
 
-        self.get_logger().info(f"Moving to X = {target_pose[0]:.1f} mm")
-
-        
-    def timer_callback(self):
-        if self.latest_pose is not None:
-            self.send_request_cartesian(self.latest_pose)
-            self.get_logger().info(f"Moving to X = {self.latest_pose[0]:.1f} mm")
-            self.latest_pose = None  # reset to avoid repeating the same command
+        self.send_servo_pose(smoothed)
+        self.last_pose = smoothed
 
 
 def main(args=None):

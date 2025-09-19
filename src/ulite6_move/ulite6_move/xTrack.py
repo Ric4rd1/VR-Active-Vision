@@ -22,7 +22,7 @@ class xTrack(Node):
         self.speed = float(80)
         self.speed_joint = float(0.2)
         self.wait = False
-        self.gain = 3.0 # Scaling headset to robot movement  
+        self.gain = 5.0 # Scaling headset to robot movement  
 
 
         # Initiation routine 
