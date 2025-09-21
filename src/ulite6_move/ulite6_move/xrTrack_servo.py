@@ -5,10 +5,10 @@ from xarm_msgs.srv import MoveCartesian, MoveJoint
 from xarm_msgs.srv import SetInt16ById, SetInt16
 import math
 
-class xTrack(Node):
+class xrTrack(Node):
     def __init__(self):
-        super().__init__('xtrack_servo')
-        self.get_logger().info('xtrack servo initialized')
+        super().__init__('xrtrack_servo')
+        self.get_logger().info('xrtrack servo initialized')
 
         # Subscribe to the track topic
         self.pose_sub = self.create_subscription(Pose, 'headset_pose', self.pose_callback, 10)
@@ -153,11 +153,44 @@ class xTrack(Node):
     
     def lerp(self, start, end, t):
         return start + t * (end - start)
+    
+    def quaternion_to_euler(self, x, y, z, w):
+        """
+        Convert a quaternion into Euler angles (roll, pitch, yaw)
+        Roll  - rotation around X-axis
+        Pitch - rotation around Y-axis
+        Yaw   - rotation around Z-axis
+        """
+
+        # Roll (x-axis rotation)
+        sinr_cosp = 2 * (w * x + y * z)
+        cosr_cosp = 1 - 2 * (x * x + y * y)
+        roll = math.atan2(sinr_cosp, cosr_cosp)
+
+        # Pitch (y-axis rotation)
+        sinp = 2 * (w * y - z * x)
+        if abs(sinp) >= 1:
+            pitch = math.copysign(math.pi / 2, sinp)  # use 90° if out of range
+        else:
+            pitch = math.asin(sinp)
+
+        # Yaw (z-axis rotation)
+        siny_cosp = 2 * (w * z + x * y)
+        cosy_cosp = 1 - 2 * (y * y + z * z)
+        yaw = math.atan2(siny_cosp, cosy_cosp)
+
+        return roll, pitch, yaw
 
     def pose_callback(self, msg):
         if not self.first_pose_received:
             self.first_pose_received = True
             self.first_pose = msg
+            self.first_pose_orientation = self.quaternion_to_euler(
+                msg.orientation.x,
+                msg.orientation.y,
+                msg.orientation.z,
+                msg.orientation.w
+            )
             self.get_logger().info("First pose received, setting reference frame")
             return
 
@@ -169,15 +202,31 @@ class xTrack(Node):
         x_offset /= self.gain  # Apply gain 
         x_offset = max(0.0, min(200.0, x_offset)) # Clamp to [0, 200 mm]
 
+        # Convert quaternion to Euler angles
+        roll, pitch, yaw = self.quaternion_to_euler(
+            msg.orientation.x,
+            msg.orientation.y,
+            msg.orientation.z,
+            msg.orientation.w
+        )
+        # Pitch 
+        pitch_offset = pitch - self.first_pose_orientation[1]
+        pitch_offset = max(-math.radians(20), min(math.radians(20), pitch_offset)) # Clamp to [-30, 30 degrees]
+        
+
+
         # Build absolute pose (only X moves, Y/Z and orientation stay at home)
         self.latest_target_pose = [
-            self.home[0] + x_offset,   # X updated
-            self.home[1],              # Y stays
-            self.home[2],              # Z stays
-            self.home[3],              # RX stays
-            self.home[4],              # RY stays
-            self.home[5],              # RZ stays
+            self.home[0] + x_offset,     # X updated
+            self.home[1],                # Y stays
+            self.home[2],                # Z stays
+            self.home[3],                # RX stays
+            self.home[4] - pitch_offset, # RY stays
+            self.home[5],                # RZ stays
         ]
+
+        #self.get_logger().info(f'ROLL: {math.degrees(roll):.2f}, PITCH: {math.degrees(pitch):.2f}, YAW: {math.degrees(yaw):.2f}')
+        self.get_logger().info(f"Moving to XR = {self.latest_target_pose[0]:.1f}X {self.latest_target_pose[4]:.2f}RY mm")
 
     def update_loop(self):
         if not self.first_pose_received or self.emergency_stop:
@@ -201,9 +250,9 @@ class xTrack(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    xtrack = xTrack()
-    rclpy.spin(xtrack)
-    xtrack.destroy_node()
+    xrtrack = xrTrack()
+    rclpy.spin(xrtrack)
+    xrtrack.destroy_node()
     rclpy.shutdown()
 
 if __name__ == '__main__':

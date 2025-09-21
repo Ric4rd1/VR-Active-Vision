@@ -1,14 +1,14 @@
 import rclpy
+import math
 from rclpy.node import Node
 from geometry_msgs.msg import Pose
 from xarm_msgs.srv import MoveCartesian, MoveJoint
 from xarm_msgs.srv import SetInt16ById, SetInt16
-import math
 
-class xTrack(Node):
+class xyzrTrack(Node):
     def __init__(self):
-        super().__init__('xtrack_servo')
-        self.get_logger().info('xtrack servo initialized')
+        super().__init__('xyzrtrack_servo')
+        self.get_logger().info('xyzrTrack servo initialized')
 
         # Subscribe to the track topic
         self.pose_sub = self.create_subscription(Pose, 'headset_pose', self.pose_callback, 10)
@@ -23,9 +23,10 @@ class xTrack(Node):
                
         # Define constants
         self.speed = float(80)
-        self.speed_joint = float(0.2)
+        #self.speed_joint = float(0.2)
         self.wait = False
         self.gain = 3.0 # Scaling headset to robot movement  
+
 
         # Initiation routine 
         self.init_robot()
@@ -38,11 +39,10 @@ class xTrack(Node):
         else:
             self.get_logger().error("Failed to move home")
 
-        self.last_pose = self.home[:]
         self.get_logger().info('Robot initialized')
 
         self.set_mode_1()
-        
+
         self.get_logger().info("Robot ready to start")
 
         self.dt = 1.0/200.0  
@@ -53,7 +53,7 @@ class xTrack(Node):
         self.tau = 0.03  # smoothing time constant (seconds)
         #self.k = 1.0 - math.exp(-self.dt/self.tau)
         self.k = 0.02
-        
+
     def init_robot(self):
         # Create a client for the /ufactory/motion_enable service
         self.motion_enable_client = self.create_client(SetInt16ById, '/ufactory/motion_enable')
@@ -137,12 +137,14 @@ class xTrack(Node):
         else:
             self.get_logger().error('Failed to call /ufactory/set_state')
 
+    # Cartesian pose for mode 1 (servo)
     def send_servo_pose(self, pose):
         req = MoveCartesian.Request()
         req.pose = pose
         future = self.client.call_async(req)
         return future
 
+    # Cartesian pose for mode 0
     def send_pose(self, pose):
         req = MoveCartesian.Request()
         req.speed = self.speed
@@ -153,11 +155,44 @@ class xTrack(Node):
     
     def lerp(self, start, end, t):
         return start + t * (end - start)
+    
+    def quaternion_to_euler(self, x, y, z, w):
+        """
+        Convert a quaternion into Euler angles (roll, pitch, yaw)
+        Roll  - rotation around X-axis
+        Pitch - rotation around Y-axis
+        Yaw   - rotation around Z-axis
+        """
+
+        # Roll (x-axis rotation)
+        sinr_cosp = 2 * (w * x + y * z)
+        cosr_cosp = 1 - 2 * (x * x + y * y)
+        roll = math.atan2(sinr_cosp, cosr_cosp)
+
+        # Pitch (y-axis rotation)
+        sinp = 2 * (w * y - z * x)
+        if abs(sinp) >= 1:
+            pitch = math.copysign(math.pi / 2, sinp)  # use 90° if out of range
+        else:
+            pitch = math.asin(sinp)
+
+        # Yaw (z-axis rotation)
+        siny_cosp = 2 * (w * z + x * y)
+        cosy_cosp = 1 - 2 * (y * y + z * z)
+        yaw = math.atan2(siny_cosp, cosy_cosp)
+
+        return roll, pitch, yaw
 
     def pose_callback(self, msg):
         if not self.first_pose_received:
             self.first_pose_received = True
             self.first_pose = msg
+            self.first_pose_orientation = self.quaternion_to_euler(
+                msg.orientation.x,
+                msg.orientation.y,
+                msg.orientation.z,
+                msg.orientation.w
+            )
             self.get_logger().info("First pose received, setting reference frame")
             return
 
@@ -169,15 +204,40 @@ class xTrack(Node):
         x_offset /= self.gain  # Apply gain 
         x_offset = max(0.0, min(200.0, x_offset)) # Clamp to [0, 200 mm]
 
+        # Compute Y displacement (meters → mm)
+        y_offset = (msg.position.y - self.first_pose.position.y) * 1000
+        y_offset /= self.gain  # Apply gain
+        y_offset = max(-100.0, min(100.0, y_offset)) # Clamp to [-100, 100 mm]
+
+        # Compute Z displacement (meters → mm)
+        z_offset = (msg.position.z - self.first_pose.position.z) * 1000
+        z_offset /= 1.5  # Apply gain
+        z_offset = max(-100.0, min(100.0, z_offset)) # Clamp to [-100, 100 mm]
+
+        # Convert quaternion to Euler angles
+        roll, pitch, yaw = self.quaternion_to_euler(
+            msg.orientation.x,
+            msg.orientation.y,
+            msg.orientation.z,
+            msg.orientation.w
+        )
+        # Pitch offset (radians)
+        pitch_offset = pitch - self.first_pose_orientation[1]
+        pitch_offset = max(-math.radians(20), min(math.radians(20), pitch_offset)) 
+        # Yaw offset (radians)
+        yaw_offset = yaw - self.first_pose_orientation[2]
+        yaw_offset = max(-math.radians(45), min(math.radians(45), yaw_offset)) 
         # Build absolute pose (only X moves, Y/Z and orientation stay at home)
         self.latest_target_pose = [
-            self.home[0] + x_offset,   # X updated
-            self.home[1],              # Y stays
-            self.home[2],              # Z stays
-            self.home[3],              # RX stays
-            self.home[4],              # RY stays
-            self.home[5],              # RZ stays
+            self.home[0] + x_offset,      # X updated
+            self.home[1] + y_offset,      # Y updated
+            self.home[2] + z_offset,      # Z stays
+            self.home[3],                 # RX stays
+            self.home[4] - pitch_offset,  # RY stays
+            self.home[5] - yaw_offset     # RZ stays
         ]
+        
+        #self.get_logger().info(f"Moving to XYZ = {target_pose[0]:.1f}X {target_pose[1]:.1f}Y {target_pose[2]:.1f}Z mm")
 
     def update_loop(self):
         if not self.first_pose_received or self.emergency_stop:
@@ -189,21 +249,20 @@ class xTrack(Node):
             smoothed.append(self.lerp(lp, tp, self.k))
 
         # Safety check: large jump
-        dx = smoothed[0] - self.last_pose[0]
-        if abs(dx) > 20.0:
-            self.get_logger().warning(f"Large jump {dx:.1f} mm, stopping")
+        d = ((self.latest_target_pose[0]-self.last_pose[0])**2 + (self.latest_target_pose[1]-self.last_pose[1])**2 + (self.latest_target_pose[2]-self.last_pose[2])**2)**0.5
+        if abs(d) > 100.0:
+            self.get_logger().warning(f"Large jump {d:.1f} mm, stopping")
             self.emergency_stop = True
             return
 
         self.send_servo_pose(smoothed)
         self.last_pose = smoothed
 
-
 def main(args=None):
     rclpy.init(args=args)
-    xtrack = xTrack()
-    rclpy.spin(xtrack)
-    xtrack.destroy_node()
+    xyzrtrack = xyzrTrack()
+    rclpy.spin(xyzrtrack)
+    xyzrtrack.destroy_node()
     rclpy.shutdown()
 
 if __name__ == '__main__':

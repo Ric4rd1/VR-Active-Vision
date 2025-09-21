@@ -27,6 +27,9 @@ setup(
             'pose_publisher = ulite6_move.pose_publisher:main',
             'xyTrack_servo = ulite6_move.xyTrack_servo:main',
             'xyzTrack_servo = ulite6_move.xyzTrack_servo:main',
-        ],
+            'xrTrack_servo = ulite6_move.xrTrack_servo:main',
+            'xyrTrack_servo = ulite6_move.xyrTrack_servo:main',
+            'xyzrTrack_servo = ulite6_move.xyzrTrack_servo:main',
+        ]
     },
 )
