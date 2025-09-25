@@ -8,7 +8,7 @@ public class RosImageSubscriber : MonoBehaviour
     ROSConnection ros;
 
     // Topic to subscribe
-    public string topicName = "/image_raw/compressed";
+    public string topicName = "/camera/camera/color/image_rect_raw/compressed";
 
     // Material or UI element where we’ll show the image
     public Renderer targetRenderer; // assign in Inspector
