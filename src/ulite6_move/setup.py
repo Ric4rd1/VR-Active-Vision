@@ -30,6 +30,7 @@ setup(
             'xrTrack_servo = ulite6_move.xrTrack_servo:main',
             'xyrTrack_servo = ulite6_move.xyrTrack_servo:main',
             'xyzrTrack_servo = ulite6_move.xyzrTrack_servo:main',
+            'predict = ulite6_move.predict:main',
         ]
     },
 )
