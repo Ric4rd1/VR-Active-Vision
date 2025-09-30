@@ -2,6 +2,7 @@ import rclpy
 import math
 from rclpy.node import Node
 from geometry_msgs.msg import Pose
+from std_msgs.msg import Bool
 from xarm_msgs.srv import MoveCartesian, MoveJoint
 from xarm_msgs.srv import SetInt16ById, SetInt16
 
@@ -12,9 +13,12 @@ class xyzrTrack(Node):
 
         # Subscribe to the track topic
         self.pose_sub = self.create_subscription(Pose, 'headset_pose', self.pose_callback, 10)
+        # Subscribe to the start topic
+        self.start_sub = self.create_subscription(Bool, 'start_signal', self.start_callback, 10)
 
         # Create variables
         self.home = [200.0, 0.0, 200.0, 3.14, -1.4, 0.0]
+        self.start = False
         self.first_pose = None
         self.first_pose_received = False
         self.emergency_stop = False
@@ -94,6 +98,17 @@ class xyzrTrack(Node):
         while not self.client.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('service not available, waiting again...')
         self.get_logger().info('Ufactory service available')
+
+    def start_callback(self, msg):
+        if msg.data and not self.start:
+            self.get_logger().info("Start signal received, starting tracking")
+            self.start = True
+            self.emergency_stop = False
+        elif not msg.data and self.start:
+            self.get_logger().info("Stop signal received, stopping tracking")
+            self.start = False
+            self.emergency_stop = True
+            self.first_pose_received = False
 
     def set_mode_0(self):
         # Call the /ufactory/set_mode service
@@ -184,6 +199,9 @@ class xyzrTrack(Node):
         return roll, pitch, yaw
 
     def pose_callback(self, msg):
+        if not self.start or self.emergency_stop:
+            return
+        
         if not self.first_pose_received:
             self.first_pose_received = True
             self.first_pose = msg
@@ -194,9 +212,6 @@ class xyzrTrack(Node):
                 msg.orientation.w
             )
             self.get_logger().info("First pose received, setting reference frame")
-            return
-
-        if self.emergency_stop:
             return
 
         # Compute X displacement (meters → mm)
