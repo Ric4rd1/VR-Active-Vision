@@ -1,15 +1,16 @@
+using RosMessageTypes.Std; 
 using System.Collections;
 using System.Collections.Generic;
-using UnityEngine;
-
-using Unity.Robotics.ROSTCPConnector;
-using RosMessageTypes.Std;  // <-- use standard messages
-
 using TMPro; // Only if using TextMeshPro
+using Unity.Robotics.ROSTCPConnector;
+using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class UI_handler : MonoBehaviour
 {
     ROSConnection ros;
+    public string topicName = "start_signal";
+    public string teleOpScene = "Teleop"; 
 
     public TMP_InputField inputField; // Input field 
 
@@ -25,6 +26,24 @@ public class UI_handler : MonoBehaviour
     void Update()
     {
         
+    }
+
+    public void OnStartButton()
+    {
+        Debug.Log("Start button pressed!");
+        try
+        {
+            BoolMsg msg = new BoolMsg(true);
+            ros.Publish(topicName, msg);
+            Debug.Log("Start signal sent to ROS2");
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning("Failed to send ROS message: " + e.Message);
+        }
+
+        // Always load the next scene
+        SceneManager.LoadScene(teleOpScene);
     }
 
     public void OnButtonPressed()

@@ -2841,6 +2841,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9e2445669d4436546898956a15c31d11, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  topicName: start_signal
+  teleOpScene: Teleop
   inputField: {fileID: 711193057724664582}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
