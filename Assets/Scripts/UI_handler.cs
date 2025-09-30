@@ -9,10 +9,10 @@ using UnityEngine.SceneManagement;
 public class UI_handler : MonoBehaviour
 {
     ROSConnection ros;
-    public string topicName = "start_signal";
     public string teleOpScene = "Teleop"; 
 
-    public TMP_InputField inputField; // Input field 
+    public TMP_InputField inputField; // Input field
+    public TMP_Dropdown dropdown; 
 
 
     // Start is called before the first frame update
@@ -20,6 +20,9 @@ public class UI_handler : MonoBehaviour
     {
         ros = ROSConnection.GetOrCreateInstance();
         ros.RegisterPublisher<StringMsg>("chatter");
+        ros.RegisterPublisher<StringMsg>("teleop_config");
+
+        ros.Publish("teleop_config", new StringMsg("MODE,STANDING")); // Default mode
     }
 
     // Update is called once per frame
@@ -28,22 +31,38 @@ public class UI_handler : MonoBehaviour
         
     }
 
-    public void OnStartButton()
+    public void OnDropdownConfirm()
     {
-        Debug.Log("Start button pressed!");
-        try
+        int option = dropdown.value; // The index of the selected option
+        string selectedText = dropdown.options[option].text; // The actual text of the option
+
+        Debug.Log("Dropdown selected: " + selectedText);
+
+        string msgText;
+        switch (option)
         {
-            BoolMsg msg = new BoolMsg(true);
-            ros.Publish(topicName, msg);
-            Debug.Log("Start signal sent to ROS2");
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogWarning("Failed to send ROS message: " + e.Message);
+            case 0:
+                msgText = "MODE,STANDING";
+                break;
+            case 1:
+                msgText = "MODE,SITTING";
+                break;
+            default:
+                msgText = "Unknown option";
+                break;
         }
 
-        // Always load the next scene
-        SceneManager.LoadScene(teleOpScene);
+        // Send message to ROS
+        StringMsg msg = new StringMsg(msgText);
+        ros.Publish("teleop_config", msg);
+        Debug.Log("Sent: " + msg.data);
+    }
+
+
+    public void OnStartButton()
+    {   
+        SceneManager.LoadScene(teleOpScene); // Switch to teleop scene
+
     }
 
     public void OnButtonPressed()

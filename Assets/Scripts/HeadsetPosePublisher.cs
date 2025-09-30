@@ -1,7 +1,8 @@
-using UnityEngine;
+using RosMessageTypes.Geometry; // for PoseMsg or PoseStampedMsg
+using RosMessageTypes.Std;
 using Unity.Robotics.ROSTCPConnector;
 using Unity.Robotics.ROSTCPConnector.MessageGeneration;
-using RosMessageTypes.Geometry; // for PoseMsg or PoseStampedMsg
+using UnityEngine;
 
 public class HeadsetPosePublisher : MonoBehaviour
 {
@@ -18,7 +19,13 @@ public class HeadsetPosePublisher : MonoBehaviour
     {
         ros = ROSConnection.GetOrCreateInstance();
         ros.RegisterPublisher<PoseMsg>(topicName);
+        ros.RegisterPublisher<BoolMsg>("start_signal");
         timer = 0f;
+
+        // Send start signal
+        BoolMsg msg = new BoolMsg(true);
+        ros.Publish("start_signal", msg);
+        Debug.Log("Start signal sent to ROS2");
     }
 
     void Update()
