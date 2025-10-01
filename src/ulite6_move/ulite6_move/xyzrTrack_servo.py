@@ -2,7 +2,7 @@ import rclpy
 import math
 from rclpy.node import Node
 from geometry_msgs.msg import Pose
-from std_msgs.msg import Bool
+from std_msgs.msg import Bool, String
 from xarm_msgs.srv import MoveCartesian, MoveJoint
 from xarm_msgs.srv import SetInt16ById, SetInt16
 
@@ -15,6 +15,8 @@ class xyzrTrack(Node):
         self.pose_sub = self.create_subscription(Pose, 'headset_pose', self.pose_callback, 10)
         # Subscribe to the start topic
         self.start_sub = self.create_subscription(Bool, 'start_signal', self.start_callback, 10)
+        # Subscribe to config topic
+        self.config_sub = self.create_subscription(String, 'teleop_config', self.config_callback, 10)
 
         # Create variables
         self.home = [200.0, 0.0, 200.0, 3.14, -1.4, 0.0]
@@ -24,39 +26,31 @@ class xyzrTrack(Node):
         self.emergency_stop = False
         self.latest_target_pose = self.home[:] # last headset target
         self.last_pose = self.home[:]          # last sent to robot
+        self.standing = False
+        self.sitting = False
                
         # Define constants
         self.speed = float(80)
         #self.speed_joint = float(0.2)
         self.wait = False
-        self.gain = 3.0 # Scaling headset to robot movement  
-
+        self.gain = 3.0 # Scaling headset to robot movement 
+        self.sitting_gain = 0.8 # Scaling headset to robot movement 
+        # Interpolation
+        self.tau = 0.03  # smoothing time constant (seconds)
+        #self.k = 1.0 - math.exp(-self.dt/self.tau)
+        self.k = 0.02
 
         # Initiation routine 
-        self.init_robot()
-        self.set_mode_0()
-        future = self.send_pose(pose=self.home)
-        rclpy.spin_until_future_complete(self, future)  # wait until move finishes
-
-        if future.result() is not None:
-            self.get_logger().info("Homed successfully")
-        else:
-            self.get_logger().error("Failed to move home")
-
-        self.get_logger().info('Robot initialized')
-
-        self.set_mode_1()
-
+        self.init_robot() # Initialize robot and services
+        self.get_logger().info('Robot Configuration initialized')
+        self.go_home() # Move to home position
         self.get_logger().info("Robot ready to start")
 
         self.dt = 1.0/200.0  
         # Create a fixed 125 Hz timer to publish smoothed poses
         self.timer = self.create_timer(self.dt, self.update_loop)
 
-        # Interpolation constant
-        self.tau = 0.03  # smoothing time constant (seconds)
-        #self.k = 1.0 - math.exp(-self.dt/self.tau)
-        self.k = 0.02
+        
 
     def init_robot(self):
         # Create a client for the /ufactory/motion_enable service
@@ -109,6 +103,38 @@ class xyzrTrack(Node):
             self.start = False
             self.emergency_stop = True
             self.first_pose_received = False
+
+    def go_home(self):
+        self.set_mode_0()
+        future = self.send_pose(pose=self.home)
+        rclpy.spin_until_future_complete(self, future)  # wait until move finishes
+
+        if future.result() is not None:
+            self.get_logger().info("Homed successfully")
+        else:
+            self.get_logger().error("Failed to move home")
+
+        self.set_mode_1() # Set to mode 1 (servo)
+
+        return future.result()
+
+    def config_callback(self, msg):
+        config = msg.data.split(',')
+        if config[0] == 'MODE':
+            if config[1] == 'STANDING':
+                self.get_logger().info("Switching to STANDING MODE")
+                self.first_pose_received = False
+                self.standing = True
+                self.sitting = False
+                #self.go_home()
+            elif config[1] == 'SITTING':
+                self.get_logger().info("Switching to SITTING MODE")
+                self.first_pose_received = False
+                self.standing = False
+                self.sitting = True
+                #self.go_home()
+
+        
 
     def set_mode_0(self):
         # Call the /ufactory/set_mode service
@@ -213,8 +239,15 @@ class xyzrTrack(Node):
             )
             self.get_logger().info("First pose received, setting reference frame")
             return
+        
+        if self.standing:
+            self.standing_mode(msg)
+        elif self.sitting:
+            self.sitting_mode(msg)
 
-        # Compute X displacement (meters → mm)
+    def standing_mode(self, msg):
+        #self.get_logger().info("Standing mode active")
+         # Compute X displacement (meters → mm)
         x_offset = (msg.position.x - self.first_pose.position.x) * 1000.0 
         x_offset /= self.gain  # Apply gain 
         x_offset = max(0.0, min(200.0, x_offset)) # Clamp to [0, 200 mm]
@@ -226,7 +259,7 @@ class xyzrTrack(Node):
 
         # Compute Z displacement (meters → mm)
         z_offset = (msg.position.z - self.first_pose.position.z) * 1000
-        z_offset /= 1.5  # Apply gain
+        z_offset /= self.gain/2.0  # Apply gain
         z_offset = max(-100.0, min(100.0, z_offset)) # Clamp to [-100, 100 mm]
 
         # Convert quaternion to Euler angles
@@ -253,6 +286,49 @@ class xyzrTrack(Node):
         ]
         
         #self.get_logger().info(f"Moving to XYZ = {target_pose[0]:.1f}X {target_pose[1]:.1f}Y {target_pose[2]:.1f}Z mm")
+
+    def sitting_mode(self, msg):
+        #self.get_logger().info("Sitting mode active")
+         # Compute X displacement (meters → mm)
+        x_offset = (msg.position.x - self.first_pose.position.x) * 1000.0 
+        x_offset /= self.sitting_gain  # Apply gain 
+        x_offset = max(0.0, min(200.0, x_offset)) # Clamp to [0, 200 mm]
+
+        # Compute Y displacement (meters → mm)
+        y_offset = (msg.position.y - self.first_pose.position.y) * 1000
+        y_offset /= self.sitting_gain  # Apply gain
+        y_offset = max(-100.0, min(100.0, y_offset)) # Clamp to [-100, 100 mm]
+
+        # Compute Z displacement (meters → mm)
+        z_offset = (msg.position.z - self.first_pose.position.z) * 1000
+        z_offset /= self.sitting_gain/2.0  # Apply gain
+        z_offset = max(-100.0, min(100.0, z_offset)) # Clamp to [-100, 100 mm]
+
+        # Convert quaternion to Euler angles
+        roll, pitch, yaw = self.quaternion_to_euler(
+            msg.orientation.x,
+            msg.orientation.y,
+            msg.orientation.z,
+            msg.orientation.w
+        )
+        # Pitch offset (radians)
+        pitch_offset = pitch - self.first_pose_orientation[1]
+        pitch_offset = max(-math.radians(20), min(math.radians(20), pitch_offset)) 
+        # Yaw offset (radians)
+        yaw_offset = yaw - self.first_pose_orientation[2]
+        yaw_offset = max(-math.radians(45), min(math.radians(45), yaw_offset)) 
+        # Build absolute pose (only X moves, Y/Z and orientation stay at home)
+        self.latest_target_pose = [
+            self.home[0] + x_offset,      # X updated
+            self.home[1] + y_offset,      # Y updated
+            self.home[2] + z_offset,      # Z stays
+            self.home[3],                 # RX stays
+            self.home[4] - pitch_offset,  # RY stays
+            self.home[5] - yaw_offset     # RZ stays
+        ]
+        
+        #self.get_logger().info(f"Moving to XYZ = {target_pose[0]:.1f}X {target_pose[1]:.1f}Y {target_pose[2]:.1f}Z mm")
+
 
     def update_loop(self):
         if not self.first_pose_received or self.emergency_stop:
