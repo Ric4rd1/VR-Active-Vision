@@ -35,7 +35,7 @@ def generate_launch_description():
     # xyzTrack servo node
     xyzTrack_servo = Node(
         package='ulite6_move',
-        executable='xyzTrack_servo',
+        executable='xyzrTrack_servo',
         output='screen',
         emulate_tty=True
     )
