@@ -32,6 +32,7 @@ setup(
             'xyzrTrack_servo = ulite6_move.xyzrTrack_servo:main',
             'predict = ulite6_move.predict:main',
             'videoStream = ulite6_move.videoStream:main',
+            'data_logger = ulite6_move.data_logger:main',
         ]
     },
 )

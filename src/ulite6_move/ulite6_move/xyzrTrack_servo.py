@@ -1,5 +1,6 @@
 import rclpy
 import math
+import time
 from rclpy.node import Node
 from geometry_msgs.msg import Pose
 from std_msgs.msg import Bool, String
@@ -99,9 +100,12 @@ class xyzrTrack(Node):
             self.start = True
             self.emergency_stop = False
         elif not msg.data and self.start:
+            '''
             self.get_logger().info("Stop signal received, stopping tracking")
             self.start = False
             self.emergency_stop = True
+            self.first_pose_received = False
+            '''
             self.first_pose_received = False
 
     def go_home(self):
