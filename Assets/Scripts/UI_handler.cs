@@ -21,7 +21,9 @@ public class UI_handler : MonoBehaviour
         ros = ROSConnection.GetOrCreateInstance();
         ros.RegisterPublisher<StringMsg>("chatter");
         ros.RegisterPublisher<StringMsg>("teleop_config");
-
+        ros.RegisterPublisher<BoolMsg>("start_signal");
+        
+        ros.Publish("start_signal", new BoolMsg(false));
         ros.Publish("teleop_config", new StringMsg("MODE,STANDING")); // Default mode
     }
 
