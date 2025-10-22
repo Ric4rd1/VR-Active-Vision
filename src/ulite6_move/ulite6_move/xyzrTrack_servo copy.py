@@ -20,8 +20,7 @@ class xyzrTrack(Node):
         self.config_sub = self.create_subscription(String, 'teleop_config', self.config_callback, 10)
 
         # Create variables
-        self.home = [200.0, 0.0, 425.0, 3.14, -1.4, 0.0]
-        #self.home = [200.0, 0.0, 200.0, 3.14, -1.4, 0.0]
+        self.home = [200.0, 0.0, 200.0, 3.14, -1.4, 0.0]
         self.start = False
         self.first_pose = None
         self.first_pose_received = False
@@ -255,17 +254,17 @@ class xyzrTrack(Node):
          # Compute X displacement (meters → mm)
         x_offset = (msg.position.x - self.first_pose.position.x) * 1000.0 
         x_offset /= self.gain  # Apply gain 
-        x_offset = max(0.0, min(80.0, x_offset)) # Clamp to [0, 200 mm]
+        x_offset = max(0.0, min(200.0, x_offset)) # Clamp to [0, 200 mm]
 
         # Compute Y displacement (meters → mm)
         y_offset = (msg.position.y - self.first_pose.position.y) * 1000
         y_offset /= self.gain  # Apply gain
-        y_offset = max(-200.0, min(220.0, y_offset)) # Clamp to [-100, 100 mm]
+        y_offset = max(-100.0, min(100.0, y_offset)) # Clamp to [-100, 100 mm]
 
         # Compute Z displacement (meters → mm)
         z_offset = (msg.position.z - self.first_pose.position.z) * 1000
-        z_offset /= self.gain/5.0  # Apply gain
-        z_offset = max(-250.0, min(150.0, z_offset)) # Clamp to [-100, 100 mm]
+        #z_offset /= self.gain/0.8  # Apply gain
+        z_offset = max(-100.0, min(100.0, z_offset)) # Clamp to [-100, 100 mm]
 
         # Convert quaternion to Euler angles
         roll, pitch, yaw = self.quaternion_to_euler(
@@ -346,7 +345,7 @@ class xyzrTrack(Node):
 
         # Safety check: large jump
         d = ((self.latest_target_pose[0]-self.last_pose[0])**2 + (self.latest_target_pose[1]-self.last_pose[1])**2 + (self.latest_target_pose[2]-self.last_pose[2])**2)**0.5
-        if abs(d) > 200.0:
+        if abs(d) > 100.0:
             self.get_logger().warning(f"Large jump {d:.1f} mm, stopping")
             self.emergency_stop = True
             return
