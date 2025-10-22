@@ -8,7 +8,8 @@ public class HeadsetPosePublisher : MonoBehaviour
 {
     public string topicName = "headset_pose";
     public float publishRate = 10f; // Hz
-    private float timer;
+    private float publishTimer;
+    private float delayTimer;
 
     private ROSConnection ros;
 
@@ -20,7 +21,8 @@ public class HeadsetPosePublisher : MonoBehaviour
         ros = ROSConnection.GetOrCreateInstance();
         ros.RegisterPublisher<PoseMsg>(topicName);
         ros.RegisterPublisher<BoolMsg>("start_signal");
-        timer = 0f;
+        publishTimer = 0f;
+        delayTimer = 0f;
 
         // Send start signal
         BoolMsg msg = new BoolMsg(true);
@@ -30,11 +32,18 @@ public class HeadsetPosePublisher : MonoBehaviour
 
     void Update()
     {
-        timer += Time.deltaTime;
-        if (timer > 1f / publishRate)
+        delayTimer += Time.deltaTime;
+
+        // Only start publishing after 1 second delay
+        if (delayTimer >= 1f)
         {
-            PublishHeadsetPose();
-            timer = 0f;
+            publishTimer += Time.deltaTime;
+
+            if (publishTimer > 1f / publishRate)
+            {
+                PublishHeadsetPose();
+                publishTimer = 0f;
+            }
         }
     }
 

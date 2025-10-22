@@ -1015,7 +1015,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   topicName: headset_pose
-  publishRate: 10
+  publishRate: 50
   headsetTransform: {fileID: 49616439}
 --- !u!4 &739944879
 Transform:
