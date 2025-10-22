@@ -62,9 +62,17 @@ public class UI_handler : MonoBehaviour
 
 
     public void OnStartButton()
-    {   
-        SceneManager.LoadScene(teleOpScene); // Switch to teleop scene
+    {
+        StringMsg msg = new StringMsg("MODE,STANDING");
+        ros.Publish("teleop_config", msg);
+        // sleep 1 sec
+        StartCoroutine(LoadSceneAfterDelay());
 
+    }
+    private IEnumerator LoadSceneAfterDelay()
+    {
+        yield return new WaitForSeconds(1f);  // wait 1 second
+        SceneManager.LoadScene(teleOpScene);
     }
 
     public void OnButtonPressed()
