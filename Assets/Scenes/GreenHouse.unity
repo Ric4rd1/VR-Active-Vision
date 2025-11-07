@@ -4460,6 +4460,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1979279101}
   - component: {fileID: 1979279100}
+  - component: {fileID: 1979279102}
   m_Layer: 0
   m_Name: ROSManager
   m_TagString: Untagged
@@ -4496,6 +4497,18 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1979279102
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1979279099}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1a9130bfc028610468601e039e9148fa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!114 &2021767317 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 2371020388013097379, guid: 20a1e358198a29444b4c55ff0590fa87,
