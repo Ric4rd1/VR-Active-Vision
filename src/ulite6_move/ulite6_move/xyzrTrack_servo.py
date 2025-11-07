@@ -19,6 +19,9 @@ class xyzrTrack(Node):
         # Subscribe to config topic
         self.config_sub = self.create_subscription(String, 'teleop_config', self.config_callback, 10)
 
+        # Debug publisher
+        self.smoothed_pose_pub = self.create_publisher(Pose, 'smoothed_headset_pose', 10)
+
         # Create variables
         self.home = [250.0, 0.0, 425.0, 3.14, -1.4, 0.0]
         #self.home = [200.0, 0.0, 200.0, 3.14, -1.4, 0.0]
@@ -350,7 +353,15 @@ class xyzrTrack(Node):
             self.get_logger().warning(f"Large jump {d:.1f} mm, stopping")
             self.emergency_stop = True
             return
-
+        
+        # Publish smoothed pose for debugging
+        '''
+        pose_msg = Pose()
+        pose_msg.position.x = smoothed[0] / 1000.0 
+        pose_msg.position.y = (smoothed[1] / 1000.0) * self.gain + self.first_pose.position.y
+        pose_msg.position.z = smoothed[2] / 1000.0 
+        self.smoothed_pose_pub.publish(pose_msg)
+        '''
         self.send_servo_pose(smoothed)
         self.last_pose = smoothed
 

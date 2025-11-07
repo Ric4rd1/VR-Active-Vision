@@ -33,6 +33,7 @@ setup(
             'predict = ulite6_move.predict:main',
             'videoStream = ulite6_move.videoStream:main',
             'data_logger = ulite6_move.data_logger:main',
+            'latency_tester = ulite6_move.latency_tester:main',
         ]
     },
 )
