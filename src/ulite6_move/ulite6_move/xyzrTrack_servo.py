@@ -20,7 +20,7 @@ class xyzrTrack(Node):
         self.config_sub = self.create_subscription(String, 'teleop_config', self.config_callback, 10)
 
         # Create variables
-        self.home = [200.0, 0.0, 425.0, 3.14, -1.4, 0.0]
+        self.home = [250.0, 0.0, 425.0, 3.14, -1.4, 0.0]
         #self.home = [200.0, 0.0, 200.0, 3.14, -1.4, 0.0]
         self.start = False
         self.first_pose = None
@@ -346,7 +346,7 @@ class xyzrTrack(Node):
 
         # Safety check: large jump
         d = ((self.latest_target_pose[0]-self.last_pose[0])**2 + (self.latest_target_pose[1]-self.last_pose[1])**2 + (self.latest_target_pose[2]-self.last_pose[2])**2)**0.5
-        if abs(d) > 200.0:
+        if abs(d) > 251.0:
             self.get_logger().warning(f"Large jump {d:.1f} mm, stopping")
             self.emergency_stop = True
             return

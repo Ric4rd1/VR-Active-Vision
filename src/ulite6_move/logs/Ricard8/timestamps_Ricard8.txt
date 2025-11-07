@@ -1,7 +1,0 @@
-Screenshot#	Timestamp(s)	Delta_t(s)
-Stopped at 1760841608.626 seconds
-1	2.477	2.477
-2	4.845	2.367
-3	7.146	2.301
-4	9.379	2.234
-Stopped at 14.565 seconds

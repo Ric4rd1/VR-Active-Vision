@@ -27,3 +27,7 @@ local_setup.*
 
 # VSCode config
 .vscode/
+
+# Log folder
+src/ulite6_move/logs/
+
