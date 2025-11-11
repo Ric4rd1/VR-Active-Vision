@@ -23,7 +23,7 @@ class xyzrTrack(Node):
         self.smoothed_pose_pub = self.create_publisher(Pose, 'smoothed_headset_pose', 10)
 
         # Create variables
-        self.home = [250.0, 0.0, 425.0, 3.14, -1.4, 0.0]
+        self.home = [300.0, 0.0, 400.0, 3.14, -1.4, 0.0]
         #self.home = [200.0, 0.0, 200.0, 3.14, -1.4, 0.0]
         self.start = False
         self.first_pose = None
@@ -43,7 +43,7 @@ class xyzrTrack(Node):
         # Interpolation
         self.tau = 0.03  # smoothing time constant (seconds)
         #self.k = 1.0 - math.exp(-self.dt/self.tau)
-        self.k = 0.02
+        self.k = 0.015
 
         # Initiation routine 
         self.init_robot() # Initialize robot and services
@@ -257,18 +257,18 @@ class xyzrTrack(Node):
         #self.get_logger().info("Standing mode active")
          # Compute X displacement (meters → mm)
         x_offset = (msg.position.x - self.first_pose.position.x) * 1000.0 
-        x_offset /= self.gain  # Apply gain 
+        x_offset /= 3.0  # Apply gain 
         x_offset = max(0.0, min(80.0, x_offset)) # Clamp to [0, 200 mm]
 
         # Compute Y displacement (meters → mm)
         y_offset = (msg.position.y - self.first_pose.position.y) * 1000
-        y_offset /= self.gain  # Apply gain
-        y_offset = max(-200.0, min(220.0, y_offset)) # Clamp to [-100, 100 mm]
+        y_offset /= 1.5  # Apply gain
+        y_offset = max(-220.0, min(220.0, y_offset)) # Clamp to [-100, 100 mm]
 
         # Compute Z displacement (meters → mm)
         z_offset = (msg.position.z - self.first_pose.position.z) * 1000
-        z_offset /= self.gain/5.0  # Apply gain
-        z_offset = max(-250.0, min(150.0, z_offset)) # Clamp to [-100, 100 mm]
+        z_offset /= 1.0  # Apply gain
+        z_offset = max(-400.0, min(15.0, z_offset)) # Clamp to [-100, 100 mm]
 
         # Convert quaternion to Euler angles
         roll, pitch, yaw = self.quaternion_to_euler(
@@ -282,7 +282,7 @@ class xyzrTrack(Node):
         pitch_offset = max(-math.radians(20), min(math.radians(20), pitch_offset)) 
         # Yaw offset (radians)
         yaw_offset = yaw - self.first_pose_orientation[2]
-        yaw_offset = max(-math.radians(45), min(math.radians(45), yaw_offset)) 
+        yaw_offset = max(-math.radians(40), min(math.radians(40), yaw_offset)) 
         # Build absolute pose (only X moves, Y/Z and orientation stay at home)
         self.latest_target_pose = [
             self.home[0] + x_offset,      # X updated
@@ -349,7 +349,7 @@ class xyzrTrack(Node):
 
         # Safety check: large jump
         d = ((self.latest_target_pose[0]-self.last_pose[0])**2 + (self.latest_target_pose[1]-self.last_pose[1])**2 + (self.latest_target_pose[2]-self.last_pose[2])**2)**0.5
-        if abs(d) > 251.0:
+        if abs(d) > 500.0:
             self.get_logger().warning(f"Large jump {d:.1f} mm, stopping")
             self.emergency_stop = True
             return
