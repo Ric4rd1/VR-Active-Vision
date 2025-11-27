@@ -136,6 +136,6 @@ ros2 run ulite6_move xyzrTrack_servo
 
 🎉 The system is now fully operational. Moving your head will update the robot-mounted stereo camera in real time.
 ## Videos 🎥
-
+https://youtu.be/p88Vtxx2Qdg 
 
 ---
