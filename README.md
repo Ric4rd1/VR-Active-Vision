@@ -4,6 +4,8 @@ This project explores the use of **Virtual Reality (VR)** to teleoperate a **rob
 The VR headset (HMD) position and orientation controls the perspective of the camera mounted on the robotic arm in real time, enabling an **active vision system**.  
 The application is oriented towards **agricultural environments**, addressing challenges such as occlusion from leaves or branches, and improving **telepresence, usability, and perceptual information comprehension**.
 
+![Scene](Spaces.png)
+
 ## ⚙️ Technologies and Hardware
 - **Meta Quest 3** (VR headset) connected to Unity via  
   - [Meta Quest Link](https://www.meta.com/en-gb/help/quest/1517439565442928/)  
@@ -12,7 +14,8 @@ The application is oriented towards **agricultural environments**, addressing ch
 - **ROS2 Humble**
 - **UFactory lite6 robot** using the [Xarm_ros2 package](https://github.com/xArm-Developer/xarm_ros2)
 - **Intel Realsense D405**  using the [ROS Wrapper for RealSense](https://github.com/realsenseai/realsense-ros)
-
+  
+![Diagram](OverallDiagram.png)
 
 ## 🚀 Setup Instructions
 For setup and installation details, please refer to the dedicated guide:  
